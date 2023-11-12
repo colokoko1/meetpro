@@ -26,7 +26,7 @@ This is a simple web application that allows users to share files and engage in 
 1. Clone the repository.
 
    ```bash
-   git clone <repository-url>
+   git clone https://github.com/colokoko1/meetpro.git
    ```
 
 2. Install dependencies.
