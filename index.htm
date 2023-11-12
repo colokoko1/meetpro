@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Code Sharing Website</title>
+    <style>
+        /* Your CSS styles here */
+    </style>
+</head>
+<body>
+
+<div id="container">
+    <button id="generate-code" onclick="generateCode()">Generate Code</button>
+    
+    <div id="access-code">
+        <label for="code-input">Enter Code:</label>
+        <input type="text" id="code-input">
+        <button onclick="validateCode()">Access</button>
+    </div>
+
+    <div id="generated-code" style="display: none;">
+        <p id="code-text"></p>
+    </div>
+
+    <div id="file-sharing" style="display: none;">
+        <h3>File Sharing</h3>
+        <input type="file" id="file-input" style="display: none;"> <!-- Hidden initially -->
+        <button onclick="toggleFileInput()">Choose File</button>
+        <button onclick="uploadFile()">Upload File</button>
+        <div id="file-browser" style="display: none;">
+            <h4>File Browser</h4>
+            <ul id="file-list"></ul>
+        </div>
+    </div>
+
+    <div id="screen-sharing" style="display: none;">
+        <h3>Screen Sharing</h3>
+        <div id="screen-sharing-options" style="display: none;">
+            <h4>Resolution Options</h4>
+            <button onclick="selectResolution(360)">360p</button>
+            <button onclick="selectResolution(480)">480p</button>
+            <button onclick="selectResolution(720)">720p</button>
+            <button onclick="selectResolution(1080)">1080p</button>
+    
+            <h4>Framerate Options</h4>
+            <div id="framerate-options"></div>
+        </div>
+    </div>
+</div>
+
+<script>
+    let currentCode;
+    let selectedResolution;
+    let selectedFramerate;
+
+    function generateCode() {
+        fetch('http://localhost:3000/generate-code', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data && data.code) {
+                console.log('Generated Code:', data.code);
+
+                // Show the generated code on the website
+                document.getElementById("generated-code").style.display = "block";
+                document.getElementById("code-text").innerText = `Your code is ${data.code}`;
+
+                // Show the screen-sharing and file-sharing sections
+                document.getElementById("screen-sharing").style.display = "block";
+                document.getElementById("file-sharing").style.display = "block";
+
+                // Show the screen-sharing options
+                document.getElementById("screen-sharing-options").style.display = "block";
+
+                // Store current code
+                currentCode = data.code;
+
+                // Hide the generate code button
+                document.getElementById("generate-code").style.display = "none";
+            } else {
+                console.error('Invalid response format:', data);
+            }
+        })
+        .catch(error => {
+            console.error('Error during code generation:', error);
+        });
+    }
+
+    function validateCode() {
+        const enteredCode = document.getElementById("code-input").value;
+
+        console.log('Entered Code:', enteredCode);
+
+        // Parse the entered code as a number
+        const parsedCode = Number(enteredCode);
+
+        console.log('Parsed Code:', parsedCode);
+
+        if (!isNaN(parsedCode)) {
+            // Send the parsed code to the server for validation
+            fetch('http://localhost:3000/validate-code', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ code: parsedCode }),
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data && data.success) {
+                    // Code is valid, show file-sharing section and file browser
+                    document.getElementById("file-sharing").style.display = "block";
+                    document.getElementById("file-browser").style.display = "block";
+                    
+                    // Update the file browser with the available files
+                    updateFileBrowser();
+
+                    // Show the screen-sharing options
+                    document.getElementById("screen-sharing-options").style.display = "block";
+                } else {
+                    // Code is invalid, you can handle this case accordingly
+                    alert('Invalid code. Please try again.');
+                }
+            })
+            .catch(error => {
+                console.error('Error during code validation:', error);
+            });
+        } else {
+            // Display an error message for invalid code
+            alert('Invalid code format. Please enter a valid code.');
+        }
+    }
+
+    function toggleFileInput() {
+        const fileInput = document.getElementById("file-input");
+        fileInput.click();
+    }
+
+    function uploadFile() {
+        const fileInput = document.getElementById("file-input");
+        const file = fileInput.files[0];
+
+        if (file) {
+            const formData = new FormData();
+            formData.append('file', file);
+
+            fetch(`http://localhost:3000/upload/${currentCode}`, {
+                method: 'POST',
+                body: formData,
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data && data.success) {
+                    alert('File uploaded successfully!');
+                    // Update the file browser with the new file
+                    updateFileBrowser();
+                } else {
+                    alert('File upload failed. Please try again.');
+                }
+            })
+            .catch(error => {
+                console.error('Error during file upload:', error);
+            });
+        } else {
+            alert('Please choose a file to upload.');
+        }
+        
+        // Clear the file input to allow selecting the same file again
+        fileInput.value = '';
+    }
+
+    function updateFileBrowser() {
+        const fileList = document.getElementById("file-list");
+        fileList.innerHTML = ''; // Clear previous list
+
+        console.log('Current Code in updateFileBrowser:', currentCode);
+
+        // Fetch the list of files in the directory and update the file browser
+        fetch(`http://localhost:3000/files/${currentCode}`)
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! Status: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data && data.files) {
+                    data.files.forEach(file => {
+                        const li = document.createElement("li");
+                        li.innerText = file;
+                        const downloadButton = document.createElement("button");
+                        downloadButton.innerText = "Download";
+                        downloadButton.onclick = () => downloadFile(file);
+                        li.appendChild(downloadButton);
+                        fileList.appendChild(li);
+                    });
+                }
+            })
+            .catch(error => {
+                console.error('Error during file list retrieval:', error);
+                alert('Failed to retrieve the file list. Please try again.');
+            });
+    }
+
+    function downloadFile(filename) {
+        fetch(`http://localhost:3000/download/${currentCode}/${filename}`)
+            .then(response => response.blob())
+            .then(blob => {
+                const url = window.URL.createObjectURL(new Blob([blob]));
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(url);
+            })
+            .catch(error => {
+                console.error('Error during file download:', error);
+                alert('File download failed. Please try again.');
+            });
+    }
+
+    function selectResolution(resolution) {
+        selectedResolution = resolution;
+        console.log(`Selected Resolution: ${resolution}p`);
+
+        // Update framerate options based on the selected resolution
+        updateFramerateOptions();
+    }
+
+    function selectFramerate(framerate) {
+        selectedFramerate = framerate;
+        console.log(`Selected Framerate: ${framerate}fps`);
+    }
+
+    function updateFramerateOptions() {
+        const framerateOptions = document.getElementById("framerate-options");
+
+        // Clear existing options
+        framerateOptions.innerHTML = '';
+
+        // Dynamic framerate options based on the selected resolution
+        const maxFramerate = getMaxFramerate(selectedResolution);
+
+        for (let i = 24; i <= maxFramerate; i += 6) {
+            const button = document.createElement("button");
+            button.innerText = `${i}fps`;
+            button.onclick = () => selectFramerate(i);
+            framerateOptions.appendChild(button);
+        }
+    }
+
+    function getMaxFramerate(resolution) {
+        // Basic logic for determining max framerate based on resolution
+        switch (resolution) {
+            case 360:
+                return 30;
+            case 480:
+                return 60;
+            case 720:
+                return 120;
+            case 1080:
+                return 120;
+            default:
+                return 30;
+        }
+    }
+</script>
+
+</body>
+</html>
